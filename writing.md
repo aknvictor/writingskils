@@ -62,7 +62,7 @@ This turns the generalization problem into one of **regularized search**: find p
 
 **A Classical Bound That Works in Practice**
 
-Let's write the bound more precisely. Given a prior $P(\theta)$ over prompts $\theta$, and a learned prompt $\hat{\theta}$, the PAC-Bayes bound states (adapted from McAllester 1999):
+Let's write the bound more precisely. Given a prior $P(\theta)$ over prompts $\theta$, and a learned prompt $\hat{\theta}$, the PAC-Bayes bound states (adapted from [McAllester 1999](#mcallester)):
 
 $R(\hat{\theta}) \leq r(\hat{\theta}) + \frac{ \mathrm{KL}(\hat{\theta} \parallel P) + \log\left(\frac{1}{\delta}\right) + 2 }{2n - 1}$
 
@@ -113,3 +113,5 @@ Prompt engineering is not just a practical hack — it's a well-founded method w
 **Reference**
 
 <a name="paper">Victor Akinwande, Yiding Jiang, Dylan Sam, J. Zico Kolter. Understanding prompt engineering may not require rethinking generalization. ICLR 2024 </a>
+
+<a name="mcallester">David A McAllester. Pac-bayesian model averaging. In Proceedings of the twelfth annual conference on Computational learning theory, pp. 164–170, 1999 </a>
