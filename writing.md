@@ -8,6 +8,8 @@ Wait, what? Isn't that overfitting? Shouldn't the test performance crash?
 
 Surprisingly, it doesn't. In this post, we'll explore *why prompt engineering tends to generalize*, even when it seems like it shouldn't — and how a classic theory of generalization (PAC-Bayes) gives us a satisfying explanation.
 
+**Zero-shot Learning with CLIP**
+
 In zero-shot learning, we use **natural language prompts** (like “a photo of a dog”) to guide models like CLIP (Contrastive Language–Image Pretraining) in making predictions. No fine-tuning, no labeled training — just cleverly chosen phrases.
 
 CLIP is a vision-language model trained to align images and text in a shared embedding space. Formally, CLIP consists of two encoders:
@@ -40,6 +42,10 @@ $$
 
 This allows CLIP to perform classification tasks **without labeled training data**, using only the **textual descriptions** of the classes.
 
+Beyond classification, CLIP enables other tasks like retrieval and visual question answering. For instance, given a query like "a photo of a beach at sunset", CLIP can rank thousands of images by their similarity to this phrase, all without fine-tuning. This flexibility comes from the shared embedding space, where semantically similar text and image pairs are pulled closer during training.
+
+---
+
 The central puzzle: if we optimize prompts on training data (e.g., via greedy search), why don't we overfit? And can we predict how well a prompt will do on test data?
 
 The answer lies in applying PAC-Bayes theory to the **space of discrete text prompts**. This isn't new theory — it's a classical tool that provides generalization guarantees by balancing:
@@ -50,15 +56,17 @@ The answer lies in applying PAC-Bayes theory to the **space of discrete text pro
 ---
 **Framing Prompt Engineering as Learning**
 
-In our [paper](#paper), we adapt this to prompt engineering:
+In our [paper](#paper), we frame prompt engineering as a learning problem within the PAC-Bayes framework. In this view, each prompt corresponds to a hypothesis — that is, a prompt defines a classifier, and the overall space of hypotheses is the discrete set of possible token sequences. The prior over this space is provided by a pretrained language model, such as LLaMA-7B, which naturally assigns higher probability to prompts that are natural, coherent text sequences. Once a specific prompt is chosen — for example, through a greedy search procedure — it becomes the posterior, represented as a point mass over the selected prompt. This setup allows us to compute a PAC-Bayes bound on generalization error that accounts both for empirical performance and the likelihood of the prompt under the language model prior.
+
+<!-- we adapt this to prompt engineering:
 
 - **Hypotheses = prompts.** Each prompt defines a classifier. The space of prompts is discrete (a finite set of token sequences).
 - **Prior = a language model.** The prior over prompts is given by a pretrained LLM like LLaMA-7B, which assigns higher probability to natural, coherent text sequences.
-- **Posterior = a chosen prompt.** The selected prompt is treated as a point mass (a deterministic choice).
+- **Posterior = a chosen prompt.** The selected prompt is treated as a point mass (a deterministic choice). -->
 
 With this setup, the PAC-Bayes bound becomes a concrete, computable upper bound on the expected test error of a prompt, based on its training error and its **log-probability under the language model**.
 
-This turns the generalization problem into one of **regularized search**: find prompts that fit the data and are likely under the language model.
+This turns the generalization problem into one of **regularized search**: find prompts that fit the data and are likely under the language model. While the number of possible token combinations is combinatorially large, natural language imposes strong semantic constraints. Another important constraint is the fixed context length of CLIP’s text encoder. In most implementations, this is 77 tokens, including special tokens like the end-of-text marker. This limit puts a hard cap on the size of the hypothesis space we can search over: any learned prompt must fit within this token budget.
 
 **A Classical Bound That Works in Practice**
 
@@ -82,13 +90,15 @@ In the case of a point-mass posterior, the KL term reduces to the negative log-p
 
  **[Caption: Test error vs. PAC-Bayes bound for prompts on CIFAR-10, CIFAR-100, and OfficeHome datasets. The data points lie close to the y = x line, showing tight correspondence.]**
 
+In our experiments, we perform prompt search using simple greedy algorithms. Starting from an (optional) initial token (e.g., "a photo of"), we iteratively select the next token that most improves performance on the training set. At each step, we evaluate candidate continuations by measuring classification accuracy using the CLIP similarity score.
+
 When this approach is applied in practice, the results are surprising. Across datasets like CIFAR-10, CIFAR-100, and ImageNet, the PAC-Bayes bounds are not only non-vacuous — they are remarkably **tight**, sometimes within **2–6%** of the actual test error. For instance, on CIFAR-10, a prompt found via greedy search has a training error of 2.3%, a test error of 2.8%, and a PAC-Bayes bound of just 8.6%. On ImageNet, with a much larger class set, the bound is still within 6% of the test error.
 
 This level of tightness is exceptional in the context of deep learning, where most generalization bounds are either loose or vacuous.
 
 Importantly, these bounds are computed **without needing data-dependent priors**, that is we don't use a validation set to improve the prior - just using a language model prior and a discrete prompt space suffices.
 
-**Why Don't Prompts Overfit?**
+**Why Prompts Generalize**
 
 Unlike neural network weights, prompts are selected from a **small, structured, and discrete** space — the set of token sequences. Even if this space is searched greedily to reduce training error, the language model prior inherently favors natural, compressible prompts. These priors act as **soft inductive biases**, gently guiding search toward hypotheses that generalize.
 
@@ -103,12 +113,16 @@ The robustness of this behavior is further illustrated when training labels are 
 
 **A Model Selection Tool**
 
-**The prompts with the tightest PAC-Bayes bounds tend to have the best test performance**. This makes the bound useful not just for analysis, but also for **prompt selection**. When multiple prompts perform similarly on the training set, we can pick the one with the smallest bound — effectively combining empirical fit with a regularization term. In addition, when the number of data points is small (e.g., n = 20), the use of PAC-Bayes is especially attractive since can use all the data points to estimate the posterior and bound its risk. In contrast to typical deep learning bounds, which degrade rapidly with small sample sizes, With only 20 labeled examples per class on CIFAR-10, the PAC-Bayes bounds are still non-vacuous.
+**The prompts with the tightest PAC-Bayes bounds tend to have the best test performance**. This makes the bound useful not just for analysis, but also for prompt selection. When multiple prompts perform similarly on the training set, we can pick the one with the smallest bound — effectively combining empirical fit with a regularization term.
+In addition, when the number of data points is small (e.g., n = 20), the use of PAC-Bayes is especially attractive since can use all the data points to estimate the posterior and bound its risk. In contrast to typical deep learning bounds, which degrade rapidly with small sample sizes, with only 20 labeled examples per class on CIFAR-10, the PAC-Bayes bounds are still non-vacuous.
+
+---
 
 **Conclusion: Prompt Engineering is Theoretically Sound**
 
-Prompt engineering is not just a practical hack — it's a well-founded method with provable generalization guarantees. The use of pretrained language models as priors, combined with the discrete structure of prompts, enables PAC-Bayes bounds that are tighter than anything previously achieved in large-scale vision tasks.
+Prompt engineering is not just a practical hack — it's a well-founded method with provable generalization guarantees. These findings suggest a broader lesson: generalization in deep learning may be easier to understand in discrete, structured hypothesis spaces, like that of natural language prompts.
 
+Rather than requiring entirely new theoretical tools, the use of pretrained language models as priors, combined with the discrete structure of prompts, enables PAC-Bayes bounds that are tighter than anything previously achieved in large-scale vision tasks.
 
 **Reference**
 
