@@ -26,7 +26,7 @@ L = -\frac{1}{N} \sum_{i=1}^{N} \log \left[
 \right]
 $$
 
-Where $ \langle \cdot, \cdot \rangle$ denotes **cosine similarity**, and $\tau$ is a **temperature parameter**.
+Where $\langle \cdot, \cdot \rangle$ denotes **cosine similarity**, and $\tau$ is a **temperature parameter**.
 
 ---
 
